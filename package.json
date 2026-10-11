@@ -1,0 +1,12 @@
+{
+  "name": "miniature-universe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A deterministic, bounded-memory miniature universe browser simulation.",
+  "scripts": {
+    "dev": "python3 -m http.server 4173",
+    "test": "node --test test/*.test.js",
+    "check": "node --check src/simulation.js && node --check src/main.js"
+  }
+}

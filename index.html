@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Miniature Universe</title>
+    <link rel="stylesheet" href="src/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="stage" aria-label="Interactive miniature universe">
+        <canvas id="universe-canvas" aria-label="Universe simulation canvas"></canvas>
+        <div class="stage-overlay">
+          <div class="brand-lockup">
+            <span class="eyebrow">A BOUNDED COSMOS</span>
+            <h1>Miniature Universe</h1>
+            <p id="view-caption">The observable model, compressed to a handful of living systems.</p>
+          </div>
+          <div class="canvas-help">Drag to pan · scroll to zoom · click an object · <kbd>Space</kbd> play</div>
+        </div>
+      </section>
+
+      <aside class="control-panel">
+        <div class="panel-topline">
+          <span class="status-dot" id="run-dot"></span>
+          <span id="run-state">PAUSED</span>
+          <span class="panel-rule"></span>
+          <span id="seed-label">SEED 777</span>
+        </div>
+
+        <div class="clock-block">
+          <span class="eyebrow">COSMIC CLOCK</span>
+          <strong id="cosmic-time">13.800 BY</strong>
+          <span id="time-rate">+0 years / sec</span>
+        </div>
+
+        <div class="control-row primary-controls">
+          <button class="button button-primary" id="play-button" type="button">Play</button>
+          <button class="button" id="reset-button" type="button">Reset</button>
+          <button class="button" id="save-button" type="button">Save</button>
+          <button class="button" id="load-button" type="button">Load</button>
+        </div>
+
+        <label class="field-label" for="speed-select">TIME SCALE</label>
+        <select id="speed-select" class="select-control">
+          <option value="1">1 year / sec</option>
+          <option value="10">10 years / sec</option>
+          <option value="100">100 years / sec</option>
+          <option value="1000" selected>1,000 years / sec</option>
+          <option value="10000">10,000 years / sec</option>
+          <option value="1000000">1 million years / sec</option>
+          <option value="100000000">100 million years / sec</option>
+        </select>
+
+        <div class="inspector-card">
+          <div class="card-heading">
+            <span class="eyebrow">CURRENT FOCUS</span>
+            <button class="text-button" id="up-button" type="button" disabled>Back</button>
+          </div>
+          <h2 id="focus-name">The miniature universe</h2>
+          <p id="focus-description">Select a galaxy to begin descending through the hierarchy.</p>
+          <dl class="stats-list" id="focus-stats"></dl>
+        </div>
+
+        <div class="memory-card">
+          <div class="card-heading">
+            <span class="eyebrow">BOUNDED MEMORY</span>
+            <span class="memory-badge" id="memory-badge">0 / 200 events</span>
+          </div>
+          <div class="memory-meter"><span id="memory-meter-fill"></span></div>
+          <p id="memory-description">Analytical orbits keep the simulation from storing every frame. Older history becomes epoch summaries.</p>
+        </div>
+
+        <div class="legend">
+          <span><i class="legend-swatch galaxy"></i> galaxy</span>
+          <span><i class="legend-swatch star"></i> star</span>
+          <span><i class="legend-swatch planet"></i> planet</span>
+          <span><i class="legend-swatch life"></i> life-bearing candidate</span>
+        </div>
+
+        <footer class="panel-footer">
+          <span>deterministic · analytical · compact</span>
+          <span>v0.1</span>
+        </footer>
+      </aside>
+    </main>
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
