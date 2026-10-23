@@ -1,6 +1,6 @@
 import {
-  createUniverse, DEFAULT_SEED, formatNumber, formatTime, getPlanet, getSnapshot, getStar, getStats,
-  planetClimate, starPhase, stepUniverse, fromSnapshot,
+  biosphereState, createUniverse, DEFAULT_SEED, formatNumber, formatTime, galaxyGasState, getPlanet,
+  getSnapshot, getStar, getStats, planetChemistry, planetClimate, starPhase, stepUniverse, fromSnapshot,
 } from "./simulation.js";
 
 const canvas = document.querySelector("#universe-canvas");
@@ -15,6 +15,7 @@ const model = {
   camera: { x: 0, y: 0, zoom: 1 }, pointer: { x: 0, y: 0, dragging: false, lastX: 0, lastY: 0 }, targets: [], previousFrame: performance.now(),
 };
 const colors = { violet: [186, 142, 255], blue: [122, 196, 255], gold: [255, 200, 112], rose: [255, 146, 192] };
+const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
 
 function resizeCanvas() {
   const ratio = Math.min(window.devicePixelRatio || 1, 2); const bounds = canvas.getBoundingClientRect();
@@ -44,10 +45,27 @@ function drawGlow(x, y, radius, color, alpha = .5) {
 }
 function drawLabel(text, x, y, color = "rgba(239,245,255,.82)") { context.font = "11px Inter, system-ui, sans-serif"; context.textAlign = "center"; context.fillStyle = color; context.fillText(text, x, y); }
 
+function layoutGalaxyPoints(galaxies) {
+  const { width, height } = size(); const points = galaxies.map((galaxy) => ({ galaxy, ...worldToScreen(galaxy.x, galaxy.y) })); const minimumDistance = 82;
+  for (let pass = 0; pass < 16; pass += 1) {
+    for (let left = 0; left < points.length; left += 1) {
+      for (let right = left + 1; right < points.length; right += 1) {
+        let dx = points[right].x - points[left].x; let dy = points[right].y - points[left].y; let distance = Math.hypot(dx, dy);
+        if (distance >= minimumDistance) continue;
+        if (distance < .01) { const angle = (left + right * 1.7) * 2.399; dx = Math.cos(angle); dy = Math.sin(angle); distance = 1; }
+        const shift = (minimumDistance - distance) / 2; const nx = dx / distance; const ny = dy / distance;
+        points[left].x -= nx * shift; points[left].y -= ny * shift; points[right].x += nx * shift; points[right].y += ny * shift;
+      }
+    }
+    for (const point of points) { point.x = clamp(point.x, 54, width - 54); point.y = clamp(point.y, 145, height - 78); }
+  }
+  return points;
+}
+
 function drawUniverse() {
   const { width, height } = size(); model.targets = [];
-  model.universe.galaxies.forEach((galaxy) => {
-    const point = worldToScreen(galaxy.x, galaxy.y); const color = colors[galaxy.tint]; drawGlow(point.x, point.y, 16 * model.camera.zoom, color, .3);
+  layoutGalaxyPoints(model.universe.galaxies).forEach(({ galaxy, x, y }) => {
+    const point = { x, y }; const color = colors[galaxy.tint]; drawGlow(point.x, point.y, 16 * model.camera.zoom, color, .3);
     context.save(); context.translate(point.x, point.y); context.rotate(galaxy.x * 2); context.strokeStyle = `rgba(${color.join(",")}, .45)`; context.lineWidth = 2; context.beginPath(); context.ellipse(0, 0, 30 * model.camera.zoom, 11 * model.camera.zoom, 0, 0, Math.PI * 2); context.stroke(); context.restore();
     context.fillStyle = `rgb(${color.join(",")})`; context.beginPath(); context.arc(point.x, point.y, 5 + model.camera.zoom * 2, 0, Math.PI * 2); context.fill(); drawLabel(galaxy.name, point.x, point.y + 34, "rgba(222,230,249,.72)"); addTarget({ type: "galaxy", galaxyId: galaxy.id }, point.x, point.y, 22);
   });
@@ -57,11 +75,16 @@ function drawUniverse() {
 function drawGalaxy(galaxy) {
   const { width, height } = size(); const color = colors[galaxy.tint]; const centerPoint = center(); drawGlow(centerPoint.x, centerPoint.y, 42, color, .22);
   context.save(); context.translate(centerPoint.x, centerPoint.y); context.fillStyle = `rgba(${color.join(",")}, .08)`; context.beginPath(); context.arc(0, 0, Math.min(width, height) * .34, 0, Math.PI * 2); context.fill(); context.strokeStyle = `rgba(${color.join(",")}, .16)`; context.lineWidth = 1; context.beginPath(); context.arc(0, 0, Math.min(width, height) * .34, 0, Math.PI * 2); context.stroke(); context.restore();
+  const gas = galaxyGasState(galaxy, model.universe.time);
+  galaxy.gas.clouds.forEach((cloud) => {
+    const point = worldToScreen(cloud.x * .32, cloud.y * .32); const radius = cloud.radius * Math.min(width, height) * gas.fraction;
+    const haze = context.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius); haze.addColorStop(0, `rgba(${color.join(",")}, ${.08 * cloud.density})`); haze.addColorStop(1, `rgba(${color.join(",")}, 0)`); context.fillStyle = haze; context.beginPath(); context.arc(point.x, point.y, radius, 0, Math.PI * 2); context.fill();
+  });
   galaxy.systems.forEach((star, index) => {
     const angle = index / galaxy.systems.length * Math.PI * 2 + galaxy.x; const radius = .11 + (index % 3) * .07; const point = worldToScreen(Math.cos(angle) * radius, Math.sin(angle) * radius * .68); const starColor = star.spectral === "M" || star.spectral === "K" ? [255, 148, 92] : star.spectral === "G" ? [255, 230, 170] : [187, 221, 255];
     drawGlow(point.x, point.y, 4, starColor, .5); context.fillStyle = `rgb(${starColor.join(",")})`; context.beginPath(); context.arc(point.x, point.y, 3.5, 0, Math.PI * 2); context.fill(); addTarget({ type: "star", galaxyId: galaxy.id, starId: star.id }, point.x, point.y, 18);
   });
-  drawLabel(`${galaxy.systems.length} star systems`, width / 2, height - 42, "rgba(161,178,211,.7)");
+  drawLabel(`${galaxy.systems.length} star systems · ${Math.round(gas.fraction * 100)}% gas reserve`, width / 2, height - 42, "rgba(161,178,211,.7)");
 }
 
 function drawSystem(galaxy, star) {
@@ -75,8 +98,8 @@ function drawSystem(galaxy, star) {
 }
 
 function drawPlanet(star, planet) {
-  const { width, height } = size(); const point = center(); const climate = planetClimate(star, planet, model.universe.time); const radius = Math.min(width, height) * .18;
-  drawGlow(point.x, point.y, radius * 1.2, planet.lifeCandidate ? [94, 219, 174] : [92, 165, 255], .18); const planetGradient = context.createRadialGradient(point.x - radius * .4, point.y - radius * .5, radius * .1, point.x, point.y, radius); planetGradient.addColorStop(0, planet.lifeCandidate ? "#a6ebcb" : "#b0d8ff"); planetGradient.addColorStop(1, planet.lifeCandidate ? "#1d6666" : "#1a376c"); context.fillStyle = planetGradient; context.beginPath(); context.arc(point.x, point.y, radius, 0, Math.PI * 2); context.fill(); context.strokeStyle = "rgba(207, 237, 255, .65)"; context.lineWidth = 2; context.stroke(); context.strokeStyle = "rgba(150, 201, 255, .24)"; context.lineWidth = 1; context.beginPath(); context.ellipse(point.x, point.y, radius * 1.35, radius * .28, -.28, 0, Math.PI * 2); context.stroke(); drawLabel(planet.name, point.x, point.y + radius + 34); drawLabel(`${Math.round(climate.temperatureK)} K · ${Math.round(climate.habitability * 100)}% habitability`, width / 2, height - 42, "rgba(161,178,211,.7)");
+  const { width, height } = size(); const point = center(); const climate = planetClimate(star, planet, model.universe.time); const biosphere = biosphereState(star, planet, model.universe.time); const radius = Math.min(width, height) * .18; const living = biosphere.stage === "microbial" || biosphere.stage === "complex";
+  drawGlow(point.x, point.y, radius * 1.2, living ? [94, 219, 174] : [92, 165, 255], .18); const planetGradient = context.createRadialGradient(point.x - radius * .4, point.y - radius * .5, radius * .1, point.x, point.y, radius); planetGradient.addColorStop(0, living ? "#a6ebcb" : "#b0d8ff"); planetGradient.addColorStop(1, living ? "#1d6666" : "#1a376c"); context.fillStyle = planetGradient; context.beginPath(); context.arc(point.x, point.y, radius, 0, Math.PI * 2); context.fill(); context.strokeStyle = "rgba(207, 237, 255, .65)"; context.lineWidth = 2; context.stroke(); context.strokeStyle = "rgba(150, 201, 255, .24)"; context.lineWidth = 1; context.beginPath(); context.ellipse(point.x, point.y, radius * 1.35, radius * .28, -.28, 0, Math.PI * 2); context.stroke(); drawLabel(planet.name, point.x, point.y + radius + 34); drawLabel(`${Math.round(climate.temperatureK)} K · ${biosphere.stage} · ${Math.round(climate.habitability * 100)}% habitability`, width / 2, height - 42, "rgba(161,178,211,.7)");
 }
 
 function draw() {
@@ -91,10 +114,10 @@ function statsMarkup(entries) { return entries.map(([label, value]) => `<div><dt
 
 function updateInspector() {
   const { level, galaxyId, starId, planetId } = model.view; const stats = getStats(model.universe); ui.up.disabled = level === "universe"; ui.seed.textContent = `SEED ${model.universe.seed}`;
-  if (level === "universe") { ui.caption.textContent = "The observable model, compressed to a handful of living systems."; ui.focusName.textContent = "The miniature universe"; ui.focusDescription.textContent = "A deterministic sandbox. Its bodies have analytical orbits; its history is summarized instead of accumulated frame by frame."; ui.focusStats.innerHTML = statsMarkup([["galaxies", stats.galaxies], ["star systems", stats.stars], ["planets", stats.planets], ["life candidates", stats.lifeCandidates]]); }
-  else if (level === "galaxy") { const galaxy = model.universe.galaxies.find((item) => item.id === galaxyId); ui.caption.textContent = `${galaxy.name} · star-system view`; ui.focusName.textContent = galaxy.name; ui.focusDescription.textContent = "A compact spiral of systems generated from the universe seed."; ui.focusStats.innerHTML = statsMarkup([["systems", galaxy.systems.length], ["color", galaxy.tint], ["age model", "mixed"], ["coordinates", `${galaxy.x.toFixed(2)}, ${galaxy.y.toFixed(2)}`]]); }
+  if (level === "universe") { ui.caption.textContent = "The observable model, compressed to a handful of living systems."; ui.focusName.textContent = "The miniature universe"; ui.focusDescription.textContent = "A deterministic sandbox. Its bodies have analytical orbits; its history is summarized instead of accumulated frame by frame."; ui.focusStats.innerHTML = statsMarkup([["galaxies", stats.galaxies], ["star systems", stats.stars], ["planets", stats.planets], ["living worlds", stats.livingWorlds]]); }
+  else if (level === "galaxy") { const galaxy = model.universe.galaxies.find((item) => item.id === galaxyId); const gas = galaxyGasState(galaxy, model.universe.time); ui.caption.textContent = `${galaxy.name} · star-system view`; ui.focusName.textContent = galaxy.name; ui.focusDescription.textContent = "A compact spiral where gas depletion and stellar recycling shape the future star-forming reserve."; ui.focusStats.innerHTML = statsMarkup([["systems", galaxy.systems.length], ["gas reserve", `${Math.round(gas.fraction * 100)}%`], ["metallicity", gas.metallicity.toFixed(4)], ["recycled gas", gas.recycled.toFixed(2)]]); }
   else if (level === "system") { const star = getStar(model.universe, galaxyId, starId); ui.caption.textContent = `${star.name} · planetary system`; ui.focusName.textContent = star.name; ui.focusDescription.textContent = `A ${star.spectral}-class star with orbiting bodies. Orbits are solved analytically, so time can accelerate without numerical drift.`; ui.focusStats.innerHTML = statsMarkup([["spectral class", star.spectral], ["phase", starPhase(star, model.universe.time)], ["mass", `${star.mass} solar`], ["planets", star.planets.length]]); }
-  else { const star = getStar(model.universe, galaxyId, starId); const planet = getPlanet(model.universe, galaxyId, starId, planetId); const climate = planetClimate(star, planet, model.universe.time); ui.caption.textContent = `${planet.name} · planetary inspection`; ui.focusName.textContent = planet.name; ui.focusDescription.textContent = planet.lifeCandidate ? "A life-bearing candidate: liquid-water and atmospheric conditions fall inside the model’s permissive origin envelope." : "A planetary body with climate conditions outside the current life-candidate envelope."; ui.focusStats.innerHTML = statsMarkup([["orbit", `${planet.orbitAU} AU`], ["temperature", `${Math.round(climate.temperatureK)} K`], ["water", `${Math.round(planet.water * 100)}%`], ["habitability", `${Math.round(climate.habitability * 100)}%`]]); }
+  else { const star = getStar(model.universe, galaxyId, starId); const planet = getPlanet(model.universe, galaxyId, starId, planetId); const climate = planetClimate(star, planet, model.universe.time); const chemistry = planetChemistry(star, planet); const biosphere = biosphereState(star, planet, model.universe.time); ui.caption.textContent = `${planet.name} · planetary inspection`; ui.focusName.textContent = planet.name; ui.focusDescription.textContent = biosphere.stage === "complex" ? "A mature modeled biosphere, derived from climate stability, chemistry, and elapsed stellar age." : biosphere.stage === "microbial" ? "A modeled microbial biosphere has emerged; complexity remains constrained by time and climate." : planet.lifeCandidate ? "A chemically and climatically plausible candidate still progressing through a prebiotic interval." : "A planetary body outside the current life-origin envelope."; ui.focusStats.innerHTML = statsMarkup([["biosphere", biosphere.stage], ["temperature", `${Math.round(climate.temperatureK)} K`], ["chemistry", `${Math.round(chemistry.suitability * 100)}%`], ["habitability", `${Math.round(climate.habitability * 100)}%`]]); }
 }
 
 function updateStatus() {

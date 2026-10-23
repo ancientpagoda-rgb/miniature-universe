@@ -20,11 +20,13 @@ npm run check
 ## Current model
 
 - five seeded galaxies containing star systems and planets;
+- deterministic gas-cloud reservoirs with analytic depletion and stellar recycling;
 - star spectral classes, lifetimes, luminosity, and stellar phases;
-- analytical planetary orbits and simple equilibrium climate/habitability;
+- analytical planetary orbits, simple equilibrium climate, and seeded planetary chemistry;
+- prebiotic, microbial, complex, and remnant biosphere stages derived from chemistry, climate, stellar age, and stellar phase;
 - accelerated cosmic time up to 100 million years per real second;
 - bounded event memory (200 events) plus 64 epoch summaries;
 - save/load through browser local storage;
 - universe → galaxy → star system → planet inspection.
 
-This is a functioning simulation sandbox, not a claim of a complete physical cosmology. The next sensible layers are gas-cloud formation, stellar feedback, chemistry, abiogenesis, and a more rigorous N-body mode for selected systems.
+This is a functioning simulation sandbox, not a claim of a complete physical cosmology. Gas, chemistry, and biosphere stages are bounded analytic models rather than a full hydrodynamic or biochemical solver. The next sensible layers are spatial cloud collapse, explicit stellar births, ecological evolution, and a more rigorous N-body mode for selected systems.
